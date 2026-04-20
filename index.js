@@ -235,6 +235,24 @@ app.get('/med', async (req, res) => {
   }
 });
 
+// Brisanje meda (samo vlasnik može obrisati svoj med)
+app.delete('/med/:id', authenticateToken, async (req, res) => {
+  try {
+    const med = await Honey.findById(req.params.id);
+    if (!med) return res.status(404).json({ error: 'Med nije pronađen' });
+
+    if (med.seller !== req.user.username) {
+      return res.status(403).json({ error: 'Nemate dozvolu obrisati tuđi med' });
+    }
+
+    await Honey.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Med obrisan', med });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Greška kod brisanja' });
+  }
+});
+
 // ----------------- KUPOVINA -----------------
 
 app.post('/kupovina', authenticateToken, async (req, res) => {
