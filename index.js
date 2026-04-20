@@ -100,8 +100,18 @@ app.get('/informacije/pcelarstvo', (req, res) => {
 app.get('/informacije/pcelarstvo/kalendar', (req, res) => {
   res.json({
     kalendar: [
-      { mjesec: "Ožujak", aktivnost: "Pregled košnica nakon zime" },
-      { mjesec: "Travanj", aktivnost: "Dodavanje nastavaka" }
+      { mjesec: "Siječanj", aktivnost: "Zimski mir - pčele u grozdu, provjera stanja s vanjske strane." },
+      { mjesec: "Veljača", aktivnost: "Prvi pregledi ako temperatura prijeđe 10°C, provjera hrane." },
+      { mjesec: "Ožujak", aktivnost: "Glavni proljetni pregled nakon zime, uklanjanje starog saća." },
+      { mjesec: "Travanj", aktivnost: "Dodavanje nastavaka, priprema za rojidbu." },
+      { mjesec: "Svibanj", aktivnost: "Vrhunac rojenja, prati i preusmjeravaj nove rojeve." },
+      { mjesec: "Lipanj", aktivnost: "Glavna paša bagrema i kestena - prvo vrcanje." },
+      { mjesec: "Srpanj", aktivnost: "Vrcanje cvjetnog meda, priprema pčela za ljetnu vrućinu." },
+      { mjesec: "Kolovoz", aktivnost: "Zamjena matica, tretman protiv varroe." },
+      { mjesec: "Rujan", aktivnost: "Prihranjivanje za zimu, smanjenje ulaza u košnicu." },
+      { mjesec: "Listopad", aktivnost: "Završno pakiranje za zimu, izolacija košnica." },
+      { mjesec: "Studeni", aktivnost: "Pčele formiraju grozd, ne otvaraj košnice." },
+      { mjesec: "Prosinac", aktivnost: "Potpuni mir, samo vizualna provjera vanjske strane." }
     ]
   });
 });
