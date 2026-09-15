@@ -123,7 +123,7 @@ app.post('/vrijeme', async (req, res) => {
   if (!lokacija) return res.status(400).json({ error: 'Nedostaje ime lokacije' });
 
   try {
-    const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(lokacija)}&count=1&language=hr`;
+    const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(lokacija)}&count=1&language=en&format=json`;
     const geocodeResponse = await axios.get(geocodeUrl);
     const locationData = geocodeResponse.data.results?.[0];
 
@@ -135,6 +135,8 @@ app.post('/vrijeme', async (req, res) => {
     const weatherResponse = await axios.get(weatherUrl);
     const weatherData = weatherResponse.data.current_weather;
 
+    if (!weatherData) return res.status(502).json({ error: 'Vremenski podaci nisu dostupni' });
+
     res.json({
       lokacija: `${name}, ${country}`,
       temperatura: `${weatherData.temperature}°C`,
@@ -142,7 +144,7 @@ app.post('/vrijeme', async (req, res) => {
       uvjeti: weatherData.weathercode,
     });
   } catch (err) {
-    console.error(err);
+    console.error('VRIJEME ERROR:', err.response?.status, err.response?.data || err.message);
     res.status(500).json({ error: 'Došlo je do pogreške pri dohvaćanju podataka' });
   }
 });
@@ -175,6 +177,7 @@ app.get('/iskustva', async (req, res) => {
     const experiences = await Experience.find().populate('medId');
     res.json({ experiences });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod dohvata iskustava' });
   }
 });
@@ -187,6 +190,7 @@ app.get('/med/:id/iskustva', async (req, res) => {
     const iskustva = await Experience.find({ medId: req.params.id });
     res.json({ med, iskustva });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška' });
   }
 });
@@ -196,24 +200,36 @@ app.put('/iskustva/:id', authenticateToken, async (req, res) => {
   if (!tekst) return res.status(400).json({ error: 'Nedostaje novi tekst' });
 
   try {
-    const updated = await Experience.findByIdAndUpdate(
-      req.params.id,
-      { tekst },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Komentar nije pronađen' });
-    res.json({ message: 'Komentar ažuriran', exp: updated });
+    const existing = await Experience.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Komentar nije pronađen' });
+
+    if (existing.username !== req.user.username) {
+      return res.status(403).json({ error: 'Nemate dozvolu urediti tuđi komentar' });
+    }
+
+    existing.tekst = tekst;
+    await existing.save();
+
+    res.json({ message: 'Komentar ažuriran', exp: existing });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod ažuriranja' });
   }
 });
 
 app.delete('/iskustva/:id', authenticateToken, async (req, res) => {
   try {
-    const deleted = await Experience.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Komentar nije pronađen' });
-    res.json({ message: 'Komentar obrisan', deleted });
+    const existing = await Experience.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Komentar nije pronađen' });
+
+    if (existing.username !== req.user.username) {
+      return res.status(403).json({ error: 'Nemate dozvolu obrisati tuđi komentar' });
+    }
+
+    await Experience.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Komentar obrisan', deleted: existing });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod brisanja' });
   }
 });
@@ -232,6 +248,7 @@ app.post('/med', authenticateToken, async (req, res) => {
     });
     res.json({ message: "Med unesen", med });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod unosa meda' });
   }
 });
@@ -241,6 +258,7 @@ app.get('/med', async (req, res) => {
     const ponuda = await Honey.find();
     res.json({ ponuda });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod dohvata ponude' });
   }
 });
@@ -280,6 +298,7 @@ app.post('/kupovina', authenticateToken, async (req, res) => {
 
     res.json({ message: `Korisnik ${req.user.username} je kupio ${selected.naziv}`, transaction });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Greška kod kupovine' });
   }
 });
