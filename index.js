@@ -118,16 +118,29 @@ app.get('/informacije/pcelarstvo/kalendar', (req, res) => {
 
 // ----------------- VREMENSKI UVJETI -----------------
 
+// Jednostavan cache u memoriji - čuva zadnji uspješan odgovor po gradu 1 sat.
+// Ako Open-Meteo odbije zahtjev (npr. 429), serviramo zadnji poznati rezultat.
+const vrijemeCache = new Map();
+const CACHE_TRAJANJE = 60 * 60 * 1000; // 1 sat
+
 app.post('/vrijeme', async (req, res) => {
   const { lokacija } = req.body;
   if (!lokacija) return res.status(400).json({ error: 'Nedostaje ime lokacije' });
 
+  const kljuc = lokacija.trim().toLowerCase();
+  const spremljeno = vrijemeCache.get(kljuc);
+
+  // Svjež cache - vrati odmah, bez zvanja vanjskog API-ja
+  if (spremljeno && Date.now() - spremljeno.vrijeme < CACHE_TRAJANJE) {
+    return res.json({ ...spremljeno.podaci, izCachea: true });
+  }
+
   try {
-    const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(lokacija)}&count=1&language=en&format=json`;
+    const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(lokacija)}&count=10&language=en&format=json&countryCode=HR`;
     const geocodeResponse = await axios.get(geocodeUrl);
     const locationData = geocodeResponse.data.results?.[0];
 
-    if (!locationData) return res.status(404).json({ error: 'Lokacija nije pronađena' });
+    if (!locationData) return res.status(404).json({ error: 'Lokacija nije pronađena u Hrvatskoj' });
 
     const { latitude, longitude, name, country } = locationData;
 
@@ -137,14 +150,29 @@ app.post('/vrijeme', async (req, res) => {
 
     if (!weatherData) return res.status(502).json({ error: 'Vremenski podaci nisu dostupni' });
 
-    res.json({
+    const rezultat = {
       lokacija: `${name}, ${country}`,
       temperatura: `${weatherData.temperature}°C`,
       vjetar: `${weatherData.windspeed} m/s`,
       uvjeti: weatherData.weathercode,
-    });
+    };
+
+    vrijemeCache.set(kljuc, { vrijeme: Date.now(), podaci: rezultat });
+
+    res.json(rezultat);
   } catch (err) {
-    console.error('VRIJEME ERROR:', err.response?.status, err.response?.data || err.message);
+    const status = err.response?.status;
+    console.error('VRIJEME ERROR:', status, err.response?.data || err.message);
+
+    // Ako imamo stari rezultat u cacheu, radije pošalji njega nego grešku
+    if (spremljeno) {
+      return res.json({ ...spremljeno.podaci, izCachea: true, zastarjelo: true });
+    }
+
+    if (status === 429) {
+      return res.status(429).json({ error: 'Vremenski servis je privremeno preopterećen. Pokušaj kasnije.' });
+    }
+
     res.status(500).json({ error: 'Došlo je do pogreške pri dohvaćanju podataka' });
   }
 });
